@@ -3,7 +3,7 @@
 open Nessos.UnionArgParser
 
 type Arguments =
-    | [<Mandatory>] IPAddress of string
+    | [<Mandatory>] IpAddress of string
     | [<Mandatory>] LocalPort of int
     | [<Mandatory>] Port of int
     | [<Mandatory>] Username of string
@@ -11,7 +11,7 @@ type Arguments =
         member this.Usage =
             match this with
             | LocalPort _ -> "Local port to open the connection from"
-            | IPAddress _ -> "Remote server ip address"
+            | IpAddress _ -> "Remote server ip address"
             | Port _ -> "Remote open port"
             | Username _ -> "Username with which to register this client"
 
@@ -23,7 +23,7 @@ module Core =
     open ReactiveGameServer.Shared.Model
     open ReactiveGameServer.Shared.Network
 
-    type private ConnectionStatus =
+    type ConnectionStatus =
         | Success of UdpClient * Guid * (int * int)
         | Failure
 
@@ -40,7 +40,8 @@ module Core =
                           return msg
                       } |> Async.RunSynchronously
             match msg with
-            | ConnectionConfirmation(id, pos) -> Success(client, id, pos)
+            | ConnectionConfirmation(id, pos) -> printfn "Successfully connected to the server, assigned id %s" (id.ToString())
+                                                 Success(client, id, pos)
             | _ -> Failure
         with
         | exn -> client.Close ()
@@ -48,9 +49,10 @@ module Core =
 
     [<EntryPoint>]
     let main argv = 
+        System.Threading.Thread.Sleep(1000)
         let parser = UnionArgParser<Arguments> ()
         let results = parser.Parse(argv)
-        let ip : string = results.GetResult <@ IPAddress @>
+        let ip : string = results.GetResult <@ IpAddress @>
         let port : int = results.GetResult <@ Port @>
         let localPort : int = results.GetResult <@ LocalPort @>
         let username : string = results.GetResult <@ Username @>
@@ -59,4 +61,5 @@ module Core =
         match status with
         | Success (client, id, pos) -> ()
         | Failure -> printfn "Unable to connect to the server. Ensure the server and your internet connection are not at fault."
+        Console.ReadLine() |> ignore
         0
