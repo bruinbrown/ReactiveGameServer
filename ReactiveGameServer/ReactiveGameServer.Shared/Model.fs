@@ -1,4 +1,4 @@
-﻿namespace Model
+﻿namespace ReactiveGameServer.Shared.Model
 
 open System
 
