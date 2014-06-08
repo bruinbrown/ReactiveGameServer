@@ -10,6 +10,7 @@ type UnitCommand =
     | KeyPress of char
 
 // You may want more messages here if you have more client options
+// These are the messages that a client can send to the server
 type ClientMessage =
     | Connect of string
     | Disconnect
@@ -22,6 +23,7 @@ type Client = {
 }
 
 // Extend this if you want to support things like kicking players for inactivity etc
+// These are the messages a server can send to the client
 type ServerMessage =
     | ConnectionConfirmation of Guid * (int * int)
     | WorldUpdate of Client list
