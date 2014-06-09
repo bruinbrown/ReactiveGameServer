@@ -33,7 +33,8 @@ module Core =
         // For now this function just returns a new location but an actual game probably will instead spawn a player in the most suitable position
         random.Next(600), random.Next(600)
     
-    let HandleConnectionRequest (client : UdpClient) (worldState:ConnectedClient list) connection un = 
+    let HandleConnectionRequest (client : UdpClient) 
+        (worldState : ConnectedClient list) connection un = 
         let id = Guid.NewGuid()
         let pos = ComputeSpawnPosition worldState
         
@@ -130,12 +131,15 @@ module Core =
         
         let state = 
             (observable |> Observable.scan (fun s t -> 
-                              printfn "%A" t
-                              HandleMessage client s t) []).Publish()
-        let disp = state.Connect ()
-        state.Sample(System.TimeSpan.FromMilliseconds(50.0)) 
-        |> Observable.subscribe (UpdateClients client) |> ignore
-        ReactiveGameServer.ReactiveHttp.StartWebStatusApi "http://localhost:8000/" state |> ignore
+                               printfn "%A" t
+                               HandleMessage client s t) []).Publish()
+        
+        let disp = state.Connect()
+        state.Sample(System.TimeSpan.FromMilliseconds(50.0))
+        |> Observable.subscribe (UpdateClients client)
+        |> ignore
+        ReactiveGameServer.ReactiveHttp.StartWebStatusApi 
+            "http://localhost:8000/" state |> ignore
         Console.ReadLine() |> ignore
-        disp.Dispose ()
+        disp.Dispose()
         0
