@@ -42,11 +42,13 @@ module Core =
         let pos = ComputeSpawnPosition worldState
         let newPlayer = { Id = id; Username = un; LastReceived = DateTime.UtcNow; Position = pos; Connection = connection }
         printfn "Received a connection request from user %s at IP %s, assigning ID %s" un (connection.ToString()) (id.ToString())
-        let clientMsg = ConnectionConfirmation(id, pos) |> Serialize
+        let currState = worldState
+                        |> List.map (fun t -> { Id = t.Id; Position = t.Position; Username = t.Username }:PlayerInfo)
+        let clientMsg = ConnectionConfirmation(id, pos, currState) |> Serialize
         client.SendAsync(clientMsg, clientMsg.Length, connection) |> Async.AwaitTask |> Async.RunSynchronously |> ignore
-        let msg = ClientJoin(un,id) |> Serialize
+        let msg = ClientJoin(un,id, pos) |> Serialize
         worldState
-        |> List.iter (fun t -> client.SendAsync(msg, msg.Length) |> Async.AwaitTask |> Async.RunSynchronously |> ignore)
+        |> List.iter (fun t -> client.SendAsync(msg, msg.Length, t.Connection) |> Async.AwaitTask |> Async.RunSynchronously |> ignore)
         newPlayer::worldState
 
     let HandleDisconnectionRequest (client:UdpClient) worldState connection =
@@ -58,11 +60,38 @@ module Core =
         |> List.iter (fun t -> client.SendAsync(msg, msg.Length) |> Async.AwaitTask |> Async.RunSynchronously |> ignore)
         others
 
+    let HandleCommand (client:UdpClient) worldState connection cmd =
+        let current, others = worldState
+                              |> List.partition (fun t -> t.Connection = connection)
+
+        let user = current.Head
+        match cmd with
+        | Movement (d) -> let dx,dy = match d with
+                                      | Up -> (0,-1)
+                                      | Left -> (-1,0)
+                                      | Down -> (0,1)
+                                      | Right -> (1,0)
+                          printfn "Received movement command from %s, Moving %A" (connection.ToString()) (dx,dy)
+                          let px, py = user.Position
+                          let newUser = { user with Position = (px + dx, py + dy) }
+                          newUser :: others
+
     let HandleMessage (client:UdpClient) worldState (connection, msg) =
         match msg with
         | Connect(un) -> HandleConnectionRequest client worldState connection un
         | Disconnect -> HandleDisconnectionRequest client worldState connection
-        | _ -> worldState
+        | UnitCommand (cmd) -> HandleCommand client worldState connection cmd
+
+    open System.Reactive.Linq
+
+    let UpdateClients (client:UdpClient) worldState =
+        let connections, state = worldState
+                                 |> List.map (fun t -> t.Connection, ({ Id = t.Id; Position = t.Position }:Client))
+                                 |> List.unzip
+        connections
+        |> List.iter (fun t -> let msg = state |> WorldUpdate |> Serialize
+                               client.Send(msg, msg.Length, t) |> ignore)
+        ()
 
     [<EntryPoint>]
     let main argv = 
@@ -73,7 +102,9 @@ module Core =
         let state = observable
                     |> Observable.scan (fun s t -> printfn "%A" t
                                                    HandleMessage client s t) []
+        //state.Buffer(System.TimeSpan.FromMilliseconds(50.0f))
+        //|> Observable.add (fun t -> let clients = List.ofSeq t)
         // For now we need to add this throwaway observer otherwise nothing will run, later on though we can change this slightly 
-        state.Add(fun t -> printfn "Completed message handler")
+        state |> Observable.add (UpdateClients client)
         Console.ReadLine () |> ignore
         0
