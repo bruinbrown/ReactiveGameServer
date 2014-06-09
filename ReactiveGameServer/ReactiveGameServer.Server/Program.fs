@@ -102,9 +102,8 @@ module Core =
         let state = observable
                     |> Observable.scan (fun s t -> printfn "%A" t
                                                    HandleMessage client s t) []
-        //state.Buffer(System.TimeSpan.FromMilliseconds(50.0f))
-        //|> Observable.add (fun t -> let clients = List.ofSeq t)
-        // For now we need to add this throwaway observer otherwise nothing will run, later on though we can change this slightly 
-        state |> Observable.add (UpdateClients client)
+
+        state.Sample(System.TimeSpan.FromMilliseconds(50.0))
+        |> Observable.add (UpdateClients client)
         Console.ReadLine () |> ignore
         0
